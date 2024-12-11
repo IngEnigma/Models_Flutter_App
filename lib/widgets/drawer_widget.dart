@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:app/main.dart';
 
 class AppDrawer extends StatelessWidget {
+  const AppDrawer({super.key});
   @override
   Widget build(BuildContext context) {
     return Drawer(
@@ -11,7 +12,7 @@ class AppDrawer extends StatelessWidget {
         children: <Widget>[
           const DrawerHeader(
             decoration: BoxDecoration(
-              color: Color(0xFF2563EB),
+              color: Color(0xFF256b8e),
             ),
             child: Text(
               'Menu',

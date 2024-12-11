@@ -1,4 +1,5 @@
 import 'package:graphql_flutter/graphql_flutter.dart';
+import 'package:app/widgets/snakbar_utils.dart';
 import 'package:app/widgets/drawer_widget.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
@@ -7,8 +8,9 @@ import 'package:app/main.dart';
 import 'dart:convert';
 
 class LinearModelPage extends StatefulWidget {
+  const LinearModelPage({super.key});
   @override
-  _LinearModelPageState createState() => _LinearModelPageState();
+  State<LinearModelPage> createState() => _LinearModelPageState();
 }
 
 class _LinearModelPageState extends State<LinearModelPage> {
@@ -106,11 +108,8 @@ class _LinearModelPageState extends State<LinearModelPage> {
   Future<void> linearModelPredict(BuildContext context) async {
     if (!validateInputs()) {
       logger.w("Entradas inválidas detectadas");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text(
-                "Por favor ingrese tres números válidos separados por comas.")),
-      );
+      showCustomSnackbar(
+          context, "Please enter three numbers separated by commas.");
       return;
     }
 
@@ -127,9 +126,16 @@ class _LinearModelPageState extends State<LinearModelPage> {
       logger.d("Enviando solicitud de predicción con payload: $payload");
       final result = await sendPredictionRequest(payload);
 
+      // Formatear las predicciones separadas por " | "
+      List<dynamic> predictions = result['predictions'] ?? [];
+      List<String> formattedPredictions = predictions
+          .map((prediction) => (prediction as List)
+              .map((p) => p is double ? p.toStringAsFixed(2) : p.toString())
+              .join(', '))
+          .toList();
+
       setState(() {
-        predictionResult = result['predictions']?.toString() ??
-            "No se encontraron predicciones.";
+        predictionResult = formattedPredictions.join(' | ');
       });
 
       logger.i("Predicción recibida: $result");
@@ -168,16 +174,23 @@ class _LinearModelPageState extends State<LinearModelPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Linear Model"),
-      ),
-      drawer: AppDrawer(),
+      appBar: AppBar(),
+      drawer: const AppDrawer(),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const Text(
+              "Linear Model",
+              textAlign: TextAlign.left,
+              style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF152D3C)),
+            ),
+            const SizedBox(height: 16),
             const Text("Numbers",
                 textAlign: TextAlign.left,
                 style: TextStyle(
@@ -199,9 +212,8 @@ class _LinearModelPageState extends State<LinearModelPage> {
             ),
             const SizedBox(height: 20),
             Center(
-              child: Container(
+              child: SizedBox(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 0),
                 child: ElevatedButton(
                   onPressed: () async {
                     if (validateInputs()) {
@@ -215,32 +227,42 @@ class _LinearModelPageState extends State<LinearModelPage> {
                     } else {
                       logger.e("Datos Invalidos");
                       setState(() {
-                        predictionResult = "Por favor ingrese números válidos.";
+                        predictionResult = "Please enter three numbers.";
                       });
                     }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF256b8e),
-                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    disabledBackgroundColor: const Color(0xFF256b8e),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  child: const Text(
-                    "Hacer Predicción",
-                    style: TextStyle(color: Color(0xFFf3f8fc), fontSize: 18),
-                  ),
+                  child: isLoading
+                      ? const SizedBox(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFFf3f8fc),
+                          ),
+                        )
+                      : const Text(
+                          "Predict",
+                          style: TextStyle(
+                            color: Color(0xFFf3f8fc),
+                            fontSize: 25,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
             ),
             const SizedBox(height: 20),
             Center(
-              child: Container(
+              child: SizedBox(
                 width: double.infinity,
-                margin: const EdgeInsets.all(0.0),
                 child: Card(
                   color: const Color(0xFF256b8e),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 13),
                       const Text(
                         "Result",
                         style: TextStyle(
@@ -249,30 +271,28 @@ class _LinearModelPageState extends State<LinearModelPage> {
                           color: Color(0xFFf3f8fc),
                         ),
                       ),
-                      if (predictionResult.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          predictionResult,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8)
-                      ] else ...[
-                        const SizedBox(height: 15),
-                        isLoading
-                            ? const CircularProgressIndicator(
-                                color: Color(0xFFf3f8fc),
-                              )
-                            : const SizedBox(height: 20),
-                      ],
+                      predictionResult.isNotEmpty
+                          ? Column(
+                              children: [
+                                const SizedBox(height: 14),
+                                Text(
+                                  predictionResult,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFFf3f8fc),
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 10),
+                              ],
+                            )
+                          : const SizedBox(height: 14),
                     ],
                   ),
                 ),
               ),
-            )
+            ),
           ],
         ),
       ),

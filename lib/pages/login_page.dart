@@ -1,11 +1,24 @@
+import 'package:app/widgets/navegation_text_button_widget.dart';
+import 'package:app/widgets/login_signup_button_widget.dart';
+import 'package:app/widgets/custom_title_text_widget.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
+import 'package:app/widgets/text_field_widget.dart';
+import 'package:app/widgets/snakbar_utils.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
 import 'package:app/main.dart';
 
-class LoginPage extends StatelessWidget {
+class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
+
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
   final TextEditingController usernameController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+  bool isLoading = false;
 
   Future<void> authenticateUser(
       BuildContext context, String username, String password) async {
@@ -19,31 +32,31 @@ class LoginPage extends StatelessWidget {
 
     final options = MutationOptions(
       document: gql(authMutation),
-      variables: {
-        'username': username,
-        'password': password,
-      },
+      variables: {'username': username, 'password': password},
     );
 
-    logger.d("Autenticación iniciada...");
     try {
-      final result = await client.value.mutate(options);
+      setState(() {
+        isLoading = true;
+      });
 
+      final result = await client.value.mutate(options);
       if (result.hasException) {
-        logger
-            .e("Error al realizar la mutación: ${result.exception.toString()}");
-      } else if (result.data == null || result.data?['tokenAuth'] == null) {
-        logger.w("Respuesta inesperada: ${result.data}");
-      } else {
+        showCustomSnackbar(context, "Authentication failed.");
+      } else if (result.data?['tokenAuth'] != null) {
         final token = result.data?['tokenAuth']['token'];
-        logger.i(
-            "Autenticación exitosa, Token recibido: $token. Username: $username");
         Provider.of<MyAppState>(context, listen: false).updateToken(token);
         Provider.of<MyAppState>(context, listen: false).updateUser(username);
         Navigator.pushNamed(context, '/logs');
+      } else {
+        showCustomSnackbar(context, "Invalid credentials.");
       }
     } catch (e) {
-      logger.e("Excepción durante la autenticación: $e");
+      showCustomSnackbar(context, "An error occurred. Please try again.");
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
@@ -56,135 +69,40 @@ class LoginPage extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              "Models App",
-              textAlign: TextAlign.left,
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF152D3C),
-              ),
-            ),
+            customTitleText("Models App"),
             const SizedBox(height: 16),
-            const Text(
-              "Login",
-              textAlign: TextAlign.left,
-              style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF152D3C)),
-            ),
+            customTitleText("Login", fontSize: 28),
             const SizedBox(height: 16),
-            const Text(
-              "Welcome back!",
-              textAlign: TextAlign.left,
-              style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.normal,
-                  color: Color(0xFF152D3C)),
-            ),
+            customTitleText("Welcome back!",
+                fontSize: 18, fontWeight: FontWeight.normal),
             const SizedBox(height: 16),
-            const Text(
-              "Username",
-              textAlign: TextAlign.left,
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.normal,
-                  color: Color(0xFF256b8e)),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: usernameController,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(8.0)),
-                  borderSide: BorderSide(
-                    color: Color(0xFF152D3C),
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(8.0)),
-                  borderSide: BorderSide(
-                    color: Color(0xFF256b8e),
-                    width: 3.0,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              "Password",
-              textAlign: TextAlign.left,
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.normal,
-                  color: Color(0xFF256b8e)),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: passwordController,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(8.0)),
-                  borderSide: BorderSide(
-                    color: Color(0xFF152D3C),
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(8.0)),
-                  borderSide: BorderSide(
-                    color: Color(0xFF256b8e),
-                    width: 3.0,
-                  ),
-                ),
-              ),
-              obscureText: true,
-            ),
+            buildTextField("Username", usernameController),
+            buildTextField("Password", passwordController, obscureText: true),
             const SizedBox(height: 24),
             Center(
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 0),
-                child: ElevatedButton(
-                  onPressed: () {
-                    final username = usernameController.text.trim();
-                    final password = passwordController.text.trim();
+              child: loginSignUpButton(
+                context: context,
+                isLoading: isLoading,
+                buttonText: "Login",
+                onPressed: () async {
+                  FocusScope.of(context).unfocus();
+                  final username = usernameController.text.trim();
+                  final password = passwordController.text.trim();
 
-                    if (username.isEmpty || password.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Please, complete the form."),
-                        ),
-                      );
-                    } else {
-                      logger.d(
-                          "Iniciando autenticación ... \nUsername: $username \nPassword: $password");
-                      authenticateUser(context, username, password);
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF256b8e),
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                  ),
-                  child: const Text(
-                    "Login",
-                    style: TextStyle(color: Color(0xFFf3f8fc), fontSize: 18),
-                  ),
-                ),
+                  if (username.isEmpty || password.isEmpty) {
+                    showCustomSnackbar(
+                        context, "Please enter username and password.");
+                  } else {
+                    await authenticateUser(context, username, password);
+                  }
+                },
               ),
             ),
             const SizedBox(height: 16),
-            Center(
-              child: TextButton(
-                onPressed: () {
-                  logger.d("Navegando al registro de usuario.");
-                  Navigator.pushNamed(context, '/signup');
-                },
-                child: const Text(
-                  "Don't have an account? Sign up",
-                  style: TextStyle(color: Color(0xFF256b8e), fontSize: 16),
-                ),
-              ),
+            navigationTextButton(
+              context: context,
+              buttonText: "Don't have an account? Sign up",
+              routeName: '/signup',
             ),
           ],
         ),

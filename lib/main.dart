@@ -25,8 +25,6 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initHiveForFlutter();
 
-  logger.d("Iniciando la aplicación...");
-
   runApp(
     MultiProvider(
       providers: [
@@ -38,8 +36,6 @@ Future<void> main() async {
       ),
     ),
   );
-
-  logger.d("Aplicación iniciada correctamente.");
 }
 
 class MyAppState extends ChangeNotifier {
@@ -79,18 +75,20 @@ class MyApp extends StatelessWidget {
           seedColor: const Color.fromARGB(255, 33, 201, 243),
         ),
       ),
-      initialRoute: '/login', // Página inicial
+      initialRoute: '/login',
       routes: {
-        '/login': (context) => LoginPage(),
-        '/signup': (context) => SingUpPage(),
-        '/logs': (context) => LogsPage(),
-        '/linear': (context) => LinearModelPage(),
+        '/login': (context) => const LoginPage(),
+        '/signup': (context) => const SingUpPage(),
+        '/logs': (context) => const LogsPage(),
+        '/linear': (context) => const LinearModelPage(),
         '/flower': (context) => FlowerModelPage(),
         '/faces': (context) => FacesModelPage(),
       },
       home: Consumer<MyAppState>(
         builder: (context, appState, child) {
-          return appState.isAuthenticated ? LogsPage() : LoginPage();
+          return appState.isAuthenticated
+              ? const LogsPage()
+              : const LoginPage();
         },
       ),
     );
