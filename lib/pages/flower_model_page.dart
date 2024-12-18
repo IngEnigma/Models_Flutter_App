@@ -1,8 +1,10 @@
+import 'package:graphql_flutter/graphql_flutter.dart';
 import 'package:app/widgets/drawer_widget.dart';
 import 'package:app/widgets/snakbar_utils.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image/image.dart' as img;
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
 import 'package:app/main.dart';
 import 'dart:convert';
@@ -100,34 +102,113 @@ class _FlowerModelPageState extends State<FlowerModelPage> {
     }
   }
 
+  Future<void> saveLogToServer(
+    BuildContext context, {
+    required String username,
+    required String requestData,
+    required String responseData,
+    required String model,
+  }) async {
+    const String createLogMutation = """
+    mutation CreateLog(\$username: String!, \$model: String!, \$requestData: String!, \$responseData: String!) {
+      createLog(username: \$username, model: \$model, requestData: \$requestData, responseData: \$responseData) {
+        log {
+          id
+          username
+          model
+          requestData
+          responseData
+          timestamp
+        }
+      }
+    }
+  """;
+
+    final client = GraphQLProvider.of(context).value;
+
+    try {
+      final result = await client.mutate(
+        MutationOptions(
+          document: gql(createLogMutation),
+          variables: {
+            "username": username,
+            "requestData": requestData,
+            "responseData": responseData,
+            "model": model,
+          },
+        ),
+      );
+
+      if (result.hasException) {
+        logger.e("Error al guardar el log: ${result.exception}");
+      } else {
+        logger.i("Log guardado exitosamente");
+      }
+    } catch (e) {
+      logger.w("Error inesperado al guardar el log: $e");
+    }
+  }
+
+  String prepareImageAsString(File imageFile) {
+    final List<List<List<double>>> imgData = prepareImage(imageFile);
+
+    return json.encode(imgData);
+  }
+
   Future<void> _predictImage() async {
     if (_selectedImage != null) {
       setState(() {
-        isLoading = true; // Activar indicador de carga
+        isLoading = true;
       });
+
+      final appState = Provider.of<MyAppState>(context, listen: false);
+      final username =
+          appState.username.isNotEmpty ? appState.username : "Usuario Anónimo";
 
       try {
         final prediction = await predictImage(_selectedImage!);
 
-        // Aquí extraemos el resultado de la predicción (ajusta según la estructura de tu respuesta)
-        final predictions =
-            prediction['predictions'][0]; // Cambia esto según tu respuesta
-        final predictedIndex = predictions.indexOf(predictions.reduce((a, b) =>
-            a > b ? a : b)); // Encontramos el índice con mayor certeza
-        final predictedFlower = flowerClasses[
-            predictedIndex]; // Usamos el índice para obtener el nombre de la flor
-        final confidence = (predictions[predictedIndex] * 100)
-            .toStringAsFixed(2); // Confianza en porcentaje
+        final predictions = prediction['predictions'][0];
+        final predictedIndex =
+            predictions.indexOf(predictions.reduce((a, b) => a > b ? a : b));
+        final predictedFlower = flowerClasses[predictedIndex];
+        final confidence =
+            (predictions[predictedIndex] * 100).toStringAsFixed(2);
 
         setState(() {
           _predictionFlower = predictedFlower;
           _predictionConfidence = confidence;
         });
+
+        final requestDataForLog = json.encode({
+          "signature_name": "serving_default",
+          "instances": [prepareImageAsString(_selectedImage!)],
+        });
+
+        await saveLogToServer(
+          context,
+          username: username,
+          model: "Flowers Model",
+          requestData: requestDataForLog,
+          responseData: json.encode(prediction),
+        );
+
+        logger.i("Predicción realizada: $prediction");
       } catch (e) {
         logger.e("Error en la predicción: $e");
+
+        await saveLogToServer(
+          context,
+          username: username,
+          model: "Flowers Model",
+          requestData: "Error al procesar la imagen seleccionada",
+          responseData: "Error: $e",
+        );
+
+        showCustomSnackbar(context, "Prediction error: $e");
       } finally {
         setState(() {
-          isLoading = false; // Desactivar indicador de carga
+          isLoading = false;
         });
       }
     } else {
@@ -160,12 +241,10 @@ class _FlowerModelPageState extends State<FlowerModelPage> {
             margin: const EdgeInsets.all(20),
             elevation: 5,
             shape: RoundedRectangleBorder(
-              borderRadius:
-                  BorderRadius.circular(20), // Bordes redondeados del Card
+              borderRadius: BorderRadius.circular(20),
             ),
             child: ClipRRect(
-              borderRadius:
-                  BorderRadius.circular(20), // Bordes redondeados de la imagen
+              borderRadius: BorderRadius.circular(20),
               child: Container(
                 height: 350,
                 width: double.infinity,
@@ -176,11 +255,9 @@ class _FlowerModelPageState extends State<FlowerModelPage> {
                     Expanded(
                       child: _selectedImage != null
                           ? Padding(
-                              padding: const EdgeInsets.all(
-                                  10), // Margen entre la imagen y el card
+                              padding: const EdgeInsets.all(10),
                               child: ClipRRect(
-                                borderRadius: BorderRadius.circular(
-                                    15), // Redondea la imagen también
+                                borderRadius: BorderRadius.circular(15),
                                 child: Image.file(
                                   _selectedImage!,
                                   fit: BoxFit.contain,
@@ -195,9 +272,8 @@ class _FlowerModelPageState extends State<FlowerModelPage> {
                               ),
                             ),
                     ),
-                    // Espacio reservado para el resultado de la predicción
                     SizedBox(
-                      height: 50, // Reservamos espacio fijo
+                      height: 50,
                       child: _predictionFlower.isNotEmpty &&
                               _predictionConfidence.isNotEmpty
                           ? Padding(
@@ -212,8 +288,7 @@ class _FlowerModelPageState extends State<FlowerModelPage> {
                                 ),
                               ),
                             )
-                          : const SizedBox
-                              .shrink(), // No ocupa espacio si no hay predicción
+                          : const SizedBox.shrink(),
                     ),
                   ],
                 ),

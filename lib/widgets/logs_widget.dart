@@ -10,6 +10,13 @@ Widget buildLogList(List logs, String Function(String) formatDate) {
   );
 }
 
+String truncateRequestData(String requestData, {int maxLength = 200}) {
+  if (requestData.length > maxLength) {
+    return requestData.substring(0, maxLength) + '...';
+  }
+  return requestData;
+}
+
 Widget buildLogCard(dynamic log, String Function(String) formatDate) {
   return Card(
     margin: const EdgeInsets.all(8.0),
@@ -23,7 +30,9 @@ Widget buildLogCard(dynamic log, String Function(String) formatDate) {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            log['user'],
+            log['username']?.isNotEmpty ?? false
+                ? log['username']
+                : 'Usuario desconocido',
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 20,
@@ -44,7 +53,15 @@ Widget buildLogCard(dynamic log, String Function(String) formatDate) {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "Solicitud: ${log['requestData']}",
+            "Modelo: ${log['model']}",
+            style: const TextStyle(
+              fontWeight: FontWeight.normal,
+              fontSize: 16,
+              color: Color(0xFFf3f8fc),
+            ),
+          ),
+          Text(
+            "Solicitud: ${truncateRequestData(log['requestData'])}",
             style: const TextStyle(
               fontWeight: FontWeight.normal,
               fontSize: 16,

@@ -63,23 +63,25 @@ class _LinearModelPageState extends State<LinearModelPage> {
 
   Future<void> saveLogToServer(
     BuildContext context, {
-    required String user,
+    required String username,
     required String requestData,
     required String responseData,
+    required String model,
   }) async {
     const String createLogMutation = """
-      mutation CreateLog(\$user: String!, \$requestData: String!, \$responseData: String!) {
-        createLog(user: \$user, requestData: \$requestData, responseData: \$responseData) {
-          log {
-            id
-            user
-            requestData
-            responseData
-            timestamp
-          }
+    mutation CreateLog(\$username: String!, \$model: String!, \$requestData: String!, \$responseData: String!) {
+      createLog(username: \$username, model: \$model, requestData: \$requestData, responseData: \$responseData) {
+        log {
+          id
+          username
+          model
+          requestData
+          responseData
+          timestamp
         }
       }
-    """;
+    }
+  """;
 
     final client = GraphQLProvider.of(context).value;
 
@@ -88,9 +90,10 @@ class _LinearModelPageState extends State<LinearModelPage> {
         MutationOptions(
           document: gql(createLogMutation),
           variables: {
-            "user": user,
+            "username": username,
             "requestData": requestData,
             "responseData": responseData,
+            "model": model,
           },
         ),
       );
@@ -115,7 +118,7 @@ class _LinearModelPageState extends State<LinearModelPage> {
 
     final payload = buildPayload();
     final appState = Provider.of<MyAppState>(context, listen: false);
-    final user =
+    final username =
         appState.username.isNotEmpty ? appState.username : "Usuario Anónimo";
 
     setState(() {
@@ -141,7 +144,8 @@ class _LinearModelPageState extends State<LinearModelPage> {
       logger.i("Predicción recibida: $result");
       await saveLogToServer(
         context,
-        user: user,
+        username: username,
+        model: "Linear Model",
         requestData: json.encode(payload),
         responseData: json.encode(result),
       );
@@ -154,7 +158,8 @@ class _LinearModelPageState extends State<LinearModelPage> {
 
       await saveLogToServer(
         context,
-        user: user,
+        username: username,
+        model: "Linear Model",
         requestData: json.encode(payload),
         responseData: "Error: $e",
       );

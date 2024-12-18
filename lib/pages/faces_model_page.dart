@@ -1,9 +1,12 @@
+import 'package:graphql_flutter/graphql_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:app/widgets/drawer_widget.dart';
 import 'package:app/widgets/snakbar_utils.dart';
 import 'package:image/image.dart' as img;
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
+import 'package:app/main.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -14,11 +17,10 @@ class FacesModelPage extends StatefulWidget {
 
 class _FacesModelPageState extends State<FacesModelPage> {
   final String baseUrl =
-      'https://tensorflow-faces-model.onrender.com/v1/models/faces-model:predict';
+      'https://tensorflow-faces-model-i3at.onrender.com/v1/models/faces-model:predict';
   bool isLoading = false;
 
-  // Clases de caras (ajustar según las clases de tu modelo)
-  List<String> faceClasses = ['Enigma', 'Nayelli'];
+  List<String> faceClasses = ['Franco', 'Miguel'];
 
   List<List<List<double>>> prepareImage(File imageFile) {
     final List<int> bytes = imageFile.readAsBytesSync();
@@ -94,33 +96,113 @@ class _FacesModelPageState extends State<FacesModelPage> {
     }
   }
 
+  Future<void> saveLogToServer(
+    BuildContext context, {
+    required String username,
+    required String requestData,
+    required String responseData,
+    required String model,
+  }) async {
+    const String createLogMutation = """
+    mutation CreateLog(\$username: String!, \$model: String!, \$requestData: String!, \$responseData: String!) {
+      createLog(username: \$username, model: \$model, requestData: \$requestData, responseData: \$responseData) {
+        log {
+          id
+          username
+          model
+          requestData
+          responseData
+          timestamp
+        }
+      }
+    }
+  """;
+
+    final client = GraphQLProvider.of(context).value;
+
+    try {
+      final result = await client.mutate(
+        MutationOptions(
+          document: gql(createLogMutation),
+          variables: {
+            "username": username,
+            "requestData": requestData,
+            "responseData": responseData,
+            "model": model,
+          },
+        ),
+      );
+
+      if (result.hasException) {
+        logger.e("Error al guardar el log: ${result.exception}");
+      } else {
+        logger.i("Log guardado exitosamente");
+      }
+    } catch (e) {
+      logger.w("Error inesperado al guardar el log: $e");
+    }
+  }
+
+  String prepareImageAsString(File imageFile) {
+    final List<List<List<double>>> imgData = prepareImage(imageFile);
+
+    return json.encode(imgData);
+  }
+
   Future<void> _predictImage() async {
     if (_selectedImage != null) {
       setState(() {
-        isLoading = true; // Activar indicador de carga
+        isLoading = true;
       });
+
+      final appState = Provider.of<MyAppState>(context, listen: false);
+      final username =
+          appState.username.isNotEmpty ? appState.username : "Usuario Anónimo";
 
       try {
         final prediction = await predictImage(_selectedImage!);
 
-        final predictions =
-            prediction['predictions'][0]; // Cambia según tu respuesta
-        final predictedIndex = predictions.indexOf(predictions.reduce((a, b) =>
-            a > b ? a : b)); // Encontramos el índice con mayor certeza
-        final predictedFace = faceClasses[
-            predictedIndex]; // Usamos el índice para obtener el nombre de la cara
-        final confidence = (predictions[predictedIndex] * 100)
-            .toStringAsFixed(2); // Confianza en porcentaje
+        final predictions = prediction['predictions'][0];
+        final predictedIndex =
+            predictions.indexOf(predictions.reduce((a, b) => a > b ? a : b));
+        final predictedFace = faceClasses[predictedIndex];
+        final confidence =
+            (predictions[predictedIndex] * 100).toStringAsFixed(2);
 
         setState(() {
           _predictionFace = predictedFace;
           _predictionConfidence = confidence;
         });
+
+        final requestDataForLog = json.encode({
+          "signature_name": "serving_default",
+          "instances": [prepareImageAsString(_selectedImage!)],
+        });
+
+        await saveLogToServer(
+          context,
+          username: username,
+          model: "Faces Model",
+          requestData: requestDataForLog,
+          responseData: json.encode(prediction),
+        );
+
+        logger.i("Predicción realizada: $prediction");
       } catch (e) {
-        debugPrint("Error en la predicción: $e");
+        logger.e("Error en la predicción: $e");
+
+        await saveLogToServer(
+          context,
+          username: username,
+          model: "Faces Model",
+          requestData: "Error al procesar la imagen seleccionada",
+          responseData: "Error: $e",
+        );
+
+        showCustomSnackbar(context, "Prediction error: $e");
       } finally {
         setState(() {
-          isLoading = false; // Desactivar indicador de carga
+          isLoading = false;
         });
       }
     } else {
@@ -184,7 +266,6 @@ class _FacesModelPageState extends State<FacesModelPage> {
                               ),
                             ),
                     ),
-                    // Espacio reservado para el resultado de la predicción
                     SizedBox(
                       height: 50,
                       child: _predictionFace.isNotEmpty &&

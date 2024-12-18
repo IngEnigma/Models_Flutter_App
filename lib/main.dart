@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
 import 'package:app/pages/linear_model_page.dart';
 import 'package:app/pages/flower_model_page.dart';
@@ -55,10 +56,12 @@ class MyAppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void logout() {
+  void logout(BuildContext context) {
+    debugPrint("logout");
     token = "";
     username = "";
     notifyListeners();
+    Navigator.pushReplacementNamed(context, '/login');
   }
 }
 
